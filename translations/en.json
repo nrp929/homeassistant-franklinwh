@@ -38,12 +38,18 @@
     "step": {
       "init": {
         "title": "FranklinWH Options",
-        "description": "Configure polling interval for your FranklinWH integration. Local API options are disabled as they are not yet functional.",
+        "description": "Configure polling interval and entity settings for your FranklinWH integration. Local API options are disabled as they are not yet functional.",
         "data": {
-          "scan_interval": "Update interval (seconds)"
+          "scan_interval": "Update interval (seconds)",
+          "use_sn": "Use Serial Number as unique ID prefix",
+          "prefix": "Entity name prefix",
+          "tolerate_stale_data": "Tolerate stale data (return cached data on failure)"
         },
         "data_description": {
-          "scan_interval": "How often to poll for updates from the cloud (minimum 30 seconds, default 60 seconds)"
+          "scan_interval": "How often to poll for updates from the cloud (minimum 30 seconds, default 60 seconds)",
+          "use_sn": "Use the gateway serial number as the unique ID prefix for entities",
+          "prefix": "Custom prefix added to entity names (e.g., 'Garage' → 'Garage Battery SOC')",
+          "tolerate_stale_data": "When enabled, returns cached data if the API is temporarily unavailable"
         }
       }
     }
@@ -81,4 +87,3 @@
     }
   }
 }
-

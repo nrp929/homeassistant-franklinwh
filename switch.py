@@ -15,7 +15,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_GATEWAY_ID, DOMAIN, MANUFACTURER, MODEL
+from .const import CONF_GATEWAY_ID, CONF_PREFIX, CONF_USE_SN, DOMAIN, MANUFACTURER, MODEL
 from .coordinator import FranklinWHCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,8 +31,8 @@ async def async_setup_entry(
     entities: list[SwitchEntity] = [GridSwitch(coordinator, entry)]
 
     await coordinator.async_config_entry_first_refresh()
-    
-    # ✅ FIX: Library 0.6.0+ made get_accessories async
+
+    # Library 0.6.0+ made get_accessories async
     accessories = await coordinator.client.get_accessories()
     _LOGGER.debug("Accessories: %s", accessories)
 
@@ -67,17 +67,29 @@ class FranklinWHSmartSwitch(CoordinatorEntity[FranklinWHCoordinator], SwitchEnti
         self._switch_id = switch_id
         self._switch_index = switch_id  # 0-indexed for API
         gateway_id = entry.data[CONF_GATEWAY_ID]
+        use_sn = entry.data.get(CONF_USE_SN, False)
+        prefix = entry.data.get(CONF_PREFIX, "")
 
-        # Set unique ID
-        self._attr_unique_id = f"{gateway_id}_switch_{switch_id + 1}"
+        # Set unique ID - use SN if configured
+        if use_sn:
+            self._attr_unique_id = f"{gateway_id}_sn_switch_{switch_id + 1}"
+        else:
+            self._attr_unique_id = f"{gateway_id}_switch_{switch_id + 1}"
 
-        # Set name
-        self._attr_name = f"Switch {switch_id + 1}"
+        # Set name with optional prefix
+        name = f"Switch {switch_id + 1}"
+        if prefix:
+            name = f"{prefix} {name}"
+        self._attr_name = name
 
         # Set device info
+        device_name = f"FranklinWH {gateway_id[-6:]}"
+        if prefix:
+            device_name = f"{prefix} {device_name}"
+
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, gateway_id)},
-            name=f"FranklinWH {gateway_id[-6:]}",
+            name=device_name,
             manufacturer=MANUFACTURER,
             model=MODEL,
             sw_version=entry.data.get("sw_version"),
@@ -147,17 +159,29 @@ class GridSwitch(CoordinatorEntity[FranklinWHCoordinator], SwitchEntity):
         super().__init__(coordinator)
 
         gateway_id = entry.data[CONF_GATEWAY_ID]
+        use_sn = entry.data.get(CONF_USE_SN, False)
+        prefix = entry.data.get(CONF_PREFIX, "")
 
-        # Set unique ID
-        self._attr_unique_id = f"{gateway_id}_grid_switch"
+        # Set unique ID - use SN if configured
+        if use_sn:
+            self._attr_unique_id = f"{gateway_id}_sn_grid_switch"
+        else:
+            self._attr_unique_id = f"{gateway_id}_grid_switch"
 
-        # Set name
-        self._attr_name = "Grid Connection"
+        # Set name with optional prefix
+        name = "Grid Connection"
+        if prefix:
+            name = f"{prefix} {name}"
+        self._attr_name = name
 
         # Set device info
+        device_name = f"FranklinWH {gateway_id[-6:]}"
+        if prefix:
+            device_name = f"{prefix} {device_name}"
+
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, gateway_id)},
-            name=f"FranklinWH {gateway_id[-6:]}",
+            name=device_name,
             manufacturer=MANUFACTURER,
             model=MODEL,
             sw_version=entry.data.get("sw_version"),
@@ -190,7 +214,7 @@ class GridSwitch(CoordinatorEntity[FranklinWHCoordinator], SwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the grid connection on."""
         try:
-            # ✅ FIX: Library 0.6.0+ made set_grid_status async
+            # Library 0.6.0+ made set_grid_status async
             await self.coordinator.client.set_grid_status(GridStatus.NORMAL)
         except Exception as err:
             _LOGGER.error("Failed to turn on grid connection: %s", err)
@@ -199,7 +223,7 @@ class GridSwitch(CoordinatorEntity[FranklinWHCoordinator], SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the grid connection off."""
         try:
-            # ✅ FIX: Library 0.6.0+ made set_grid_status async
+            # Library 0.6.0+ made set_grid_status async
             await self.coordinator.client.set_grid_status(GridStatus.OFF)
         except Exception as err:
             _LOGGER.error("Failed to turn off grid connection: %s", err)

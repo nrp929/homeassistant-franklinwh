@@ -21,7 +21,10 @@ import voluptuous as vol
 from .const import (
     CONF_GATEWAY_ID,
     CONF_LOCAL_HOST,
+    CONF_PREFIX,
+    CONF_TOLERATE_STALE_DATA,
     CONF_USE_LOCAL_API,
+    CONF_USE_SN,
     DOMAIN,
 )
 from .coordinator import FranklinWHCoordinator
@@ -47,6 +50,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     gateway_id = entry.data[CONF_GATEWAY_ID]
     use_local_api = entry.data.get(CONF_USE_LOCAL_API, False)
     local_host = entry.data.get(CONF_LOCAL_HOST)
+    use_sn = entry.data.get(CONF_USE_SN, False)
+    prefix = entry.data.get(CONF_PREFIX, "")
+    tolerate_stale_data = entry.data.get(CONF_TOLERATE_STALE_DATA, False)
 
     # Create coordinator
     coordinator = FranklinWHCoordinator(
@@ -56,6 +62,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         gateway_id=gateway_id,
         use_local_api=use_local_api,
         local_host=local_host,
+        tolerate_stale_data=tolerate_stale_data,
     )
 
     # Fetch initial data

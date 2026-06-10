@@ -7,6 +7,9 @@ DOMAIN: Final = "franklin_wh"
 CONF_GATEWAY_ID: Final = "gateway_id"
 CONF_USE_LOCAL_API: Final = "use_local_api"
 CONF_LOCAL_HOST: Final = "local_host"
+CONF_USE_SN: Final = "use_sn"
+CONF_PREFIX: Final = "prefix"
+CONF_TOLERATE_STALE_DATA: Final = "tolerate_stale_data"
 
 # Default values
 DEFAULT_NAME: Final = "FranklinWH"
@@ -46,4 +49,3 @@ OPERATION_MODES: Final = [
     MODE_TIME_OF_USE,
     MODE_CLEAN_BACKUP,
 ]
-

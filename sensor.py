@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
+from franklinwh import GridStatus
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -23,7 +25,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_GATEWAY_ID, DOMAIN, MANUFACTURER, MODEL
+from .const import CONF_GATEWAY_ID, CONF_PREFIX, CONF_USE_SN, DOMAIN, MANUFACTURER, MODEL
 from .coordinator import FranklinWHCoordinator, FranklinWHData
 
 _LOGGER = logging.getLogger(__name__)
@@ -212,12 +214,15 @@ async def async_setup_entry(
 ) -> None:
     """Set up FranklinWH sensor based on a config entry."""
     coordinator: FranklinWHCoordinator = hass.data[DOMAIN][entry.entry_id]
-    
+
     entities = [
         FranklinWHSensorEntity(coordinator, description, entry)
         for description in SENSOR_TYPES
     ]
-    
+
+    # Add GridStatus sensor (from upstream)
+    entities.append(GridStatusSensor(coordinator, entry))
+
     async_add_entities(entities)
 
 
@@ -236,16 +241,25 @@ class FranklinWHSensorEntity(CoordinatorEntity[FranklinWHCoordinator], SensorEnt
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = description
-        
+
         gateway_id = entry.data[CONF_GATEWAY_ID]
-        
-        # Set unique ID
-        self._attr_unique_id = f"{gateway_id}_{description.key}"
-        
-        # Set device info
+        use_sn = entry.data.get(CONF_USE_SN, False)
+        prefix = entry.data.get(CONF_PREFIX, "")
+
+        # Set unique ID - use SN if configured
+        if use_sn:
+            self._attr_unique_id = f"{gateway_id}_sn_{description.key}"
+        else:
+            self._attr_unique_id = f"{gateway_id}_{description.key}"
+
+        # Set device info with optional prefix
+        device_name = f"FranklinWH {gateway_id[-6:]}"
+        if prefix:
+            device_name = f"{prefix} {device_name}"
+
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, gateway_id)},
-            name=f"FranklinWH {gateway_id[-6:]}",
+            name=device_name,
             manufacturer=MANUFACTURER,
             model=MODEL,
             sw_version=entry.data.get("sw_version"),
@@ -256,7 +270,7 @@ class FranklinWHSensorEntity(CoordinatorEntity[FranklinWHCoordinator], SensorEnt
         """Return the state of the sensor."""
         if self.entity_description.value_fn is None:
             return None
-        
+
         try:
             return self.entity_description.value_fn(self.coordinator.data)
         except (AttributeError, TypeError, KeyError) as err:
@@ -272,4 +286,67 @@ class FranklinWHSensorEntity(CoordinatorEntity[FranklinWHCoordinator], SensorEnt
             super().available
             and self.coordinator.data is not None
             and self.coordinator.data.stats is not None
+        )
+
+
+class GridStatusSensor(CoordinatorEntity[FranklinWHCoordinator], SensorEntity):
+    """Representation of the grid status sensor."""
+
+    _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_icon = "mdi:transmission-tower"
+    _attr_name = "Grid Status"
+
+    def __init__(
+        self,
+        coordinator: FranklinWHCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the grid status sensor."""
+        super().__init__(coordinator)
+
+        gateway_id = entry.data[CONF_GATEWAY_ID]
+        use_sn = entry.data.get(CONF_USE_SN, False)
+
+        # Set unique ID
+        if use_sn:
+            self._attr_unique_id = f"{gateway_id}_sn_grid_status"
+        else:
+            self._attr_unique_id = f"{gateway_id}_grid_status"
+
+        # Set device info
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, gateway_id)},
+            name=f"FranklinWH {gateway_id[-6:]}",
+            manufacturer=MANUFACTURER,
+            model=MODEL,
+            sw_version=entry.data.get("sw_version"),
+        )
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the grid status as a string."""
+        if self.coordinator.data is None or self.coordinator.data.stats is None:
+            return None
+
+        match self.coordinator.data.stats.current.grid_status:
+            case GridStatus.NORMAL:
+                return "Normal"
+            case GridStatus.OFF:
+                return "Off"
+            case GridStatus.CHARGING:
+                return "Charging"
+            case GridStatus.DISCHARGING:
+                return "Discharging"
+            case _:
+                return None
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return (
+            super().available
+            and self.coordinator.data is not None
+            and self.coordinator.data.stats is not None
+            and self.coordinator.data.stats.current.grid_status is not None
         )

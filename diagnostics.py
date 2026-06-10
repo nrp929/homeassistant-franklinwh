@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_GATEWAY_ID, DOMAIN
+from .const import CONF_GATEWAY_ID, CONF_PREFIX, CONF_TOLERATE_STALE_DATA, CONF_USE_SN, DOMAIN
 from .coordinator import FranklinWHCoordinator
 
 TO_REDACT = {CONF_PASSWORD, CONF_USERNAME, CONF_GATEWAY_ID, "token", "access_token"}
@@ -19,15 +19,16 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
     coordinator: FranklinWHCoordinator = hass.data[DOMAIN][entry.entry_id]
-    
+
     diagnostics_data = {
         "entry": {
             "title": entry.title,
             "data": async_redact_data(entry.data, TO_REDACT),
+            "options": entry.options,
         },
         "coordinator_data": await _async_get_coordinator_diagnostics(coordinator),
     }
-    
+
     return diagnostics_data
 
 
@@ -37,7 +38,7 @@ async def _async_get_coordinator_diagnostics(
     """Get diagnostics for the coordinator."""
     if coordinator.data is None:
         return {"error": "No data available"}
-    
+
     diagnostics = {
         "last_update_success": coordinator.last_update_success,
         "last_update_time": coordinator.last_update_success_time.isoformat()
@@ -46,8 +47,9 @@ async def _async_get_coordinator_diagnostics(
         "update_interval": coordinator.update_interval.total_seconds()
         if coordinator.update_interval
         else None,
+        "stale_data_cache_populated": coordinator.cache.is_populated(),
     }
-    
+
     # Add stats data if available
     if coordinator.data.stats:
         try:
@@ -81,7 +83,7 @@ async def _async_get_coordinator_diagnostics(
             }
         except Exception as err:
             diagnostics["stats_error"] = str(err)
-    
+
     # Add switch state data if available
     if coordinator.data.switch_state:
         diagnostics["switch_state"] = {
@@ -95,6 +97,5 @@ async def _async_get_coordinator_diagnostics(
             if len(coordinator.data.switch_state) > 2
             else None,
         }
-    
-    return diagnostics
 
+    return diagnostics
