@@ -6,13 +6,14 @@ This is a modern custom integration for [Home Assistant](https://www.home-assist
 
 ## 📝 About This Fork
 
-This fork adds **working operation mode control** to the excellent integration created by Joshua Seidel ([@JoshuaSeidel](https://github.com/JoshuaSeidel)).
+This fork merges upstream improvements from [@richo](https://github.com/richo)'s original integration into a feature-rich fork by [@nrp929](https://github.com/nrp929), building on the excellent rewrite by Joshua Seidel ([@JoshuaSeidel](https://github.com/JoshuaSeidel)).
 
-**Credits:**
+**Credits & Attribution:**
+- **Original integration & Python library**: [@richo](https://github.com/richo) — [franklinwh-python](https://github.com/richo/franklinwh-python)
 - **Complete rewrite**: Joshua Seidel ([@JoshuaSeidel](https://github.com/JoshuaSeidel)) with Anthropic Claude Sonnet 4.5
 - **set_mode service implementation**: Based on [@j4m3z0r](https://github.com/j4m3z0r)'s working fork
-- **Original integration**: [@richo](https://github.com/richo)
-- **Python library**: [franklinwh-python](https://github.com/richo/franklinwh-python) by [@richo](https://github.com/richo)
+- **Upstream v2026.3.0 features** (HTTP/2, StaleDataCache, enhanced retry, new sensors): [@richo](https://github.com/richo)
+- **Merge engineering & fork feature preservation**: [@nrp929](https://github.com/nrp929) with Hermes Agent
 
 ## ✨ Features
 
@@ -24,11 +25,13 @@ This fork adds **working operation mode control** to the excellent integration c
 - 🏠 Home load power monitoring
 - 🔀 Smart circuit switch monitoring (Switches 1-3)
 - 🚗 V2L (Vehicle-to-Load) data support
+- 🔋 **Grid Status** (Normal/Off/Charging/Discharging) — *new in v2026.3.1*
 
 ### Control
 - 🎛️ **Individual smart circuit switch control**
 - ⚙️ **Operation mode selection** (Time of Use, Self Consumption, Emergency Backup)
 - 🔋 **Battery reserve setting** (integrated with mode selection)
+- 🔌 **Grid Connection toggle** (on/off)
 
 ### Integration Features
 - 🎨 Config Flow: Easy setup through the Home Assistant UI
@@ -36,6 +39,9 @@ This fork adds **working operation mode control** to the excellent integration c
 - 📱 Device Registry: All entities grouped under one device
 - 🔍 Diagnostics: Built-in debugging support
 - 🌐 Local API Support: Experimental local communication (when available)
+- 🛡️ **Stale data cache**: Graceful degradation on API failures — *new in v2026.3.1*
+- ⚡ **HTTP/2 support**: Faster cloud communication (auto-detected) — *new in v2026.3.1*
+- 🔄 **Enhanced retry logic**: Specific exception handling for timeouts, offline gateways, locked accounts — *new in v2026.3.1*
 
 ## 🚀 Installation
 
@@ -63,9 +69,18 @@ This fork adds **working operation mode control** to the excellent integration c
    - **Email Address**: Your FranklinWH account email
    - **Password**: Your FranklinWH account password
    - **Gateway ID**: Find this in the FranklinWH app under **More → Site Address → SN**
-   - **Use Local API** (optional): Enable for experimental local communication
-   - **Local Host** (optional): IP address of your FranklinWH gateway
 5. Click **Submit** and your devices will be added automatically!
+
+### Options (after setup)
+
+Go to **Settings → Devices & Services → FranklinWH → Configure** to adjust:
+
+| Option | Description |
+|--------|-------------|
+| **Update interval** | Polling frequency (30-3600 seconds, default 60) |
+| **Use Serial Number** | Use gateway SN as unique ID prefix for entities |
+| **Entity name prefix** | Custom prefix for entity names (e.g., "Garage" → "Garage Battery SOC") |
+| **Tolerate stale data** | Return cached data if API is temporarily unavailable |
 
 ## 📊 Available Entities
 
@@ -86,6 +101,7 @@ This fork adds **working operation mode control** to the excellent integration c
 | Solar Energy | Total solar energy produced | kWh |
 | Generator Use | Generator power output (live) | kW |
 | Generator Energy | Total generator energy produced | kWh |
+| Grid Status | Current grid connection status | Enum |
 | Switch 1 Load | Power draw on Switch 1 | W |
 | Switch 1 Lifetime Use | Total energy used by Switch 1 | kWh |
 | Switch 2 Load | Power draw on Switch 2 | W |
@@ -101,6 +117,7 @@ This fork adds **working operation mode control** to the excellent integration c
 | Switch 1 | Control smart circuit 1 |
 | Switch 2 | Control smart circuit 2 |
 | Switch 3 | Control smart circuit 3 |
+| Grid Connection | Toggle grid connection on/off |
 
 ## 🛠️ Services
 
@@ -238,7 +255,52 @@ When reporting issues, please:
 
 ## 📋 Changelog
 
-### Version 1.0.9
+### Version 2026.3.1 (2026-06-10) — Merge Release
+
+**Upstream features merged from [@richo](https://github.com/richo) (v2026.3.0):**
+- ⚡ **HTTP/2 support** with ALPN negotiation (auto-detected for HA 2026.2+)
+- 🛡️ **StaleDataCache** — returns cached data on API failures instead of going unavailable
+- 🔄 **Enhanced retry logic** with specific exception handling:
+  - `DeviceTimeoutException` — gateway not responding
+  - `GatewayOfflineException` — gateway offline
+  - `AccountLockedException` — account locked
+  - `InvalidCredentialsException` — auth failure
+  - `InvalidDataException` — malformed response
+  - `httpx.ReadTimeout` — network timeout
+- 📊 **Generator Energy sensor** — total generator energy produced (kWh)
+- 🔋 **Grid Status sensor** — enum sensor showing Normal/Off/Charging/Discharging
+- ⚙️ **New config options**:
+  - `use_sn` — serial number as unique ID prefix
+  - `prefix` — custom entity name prefix
+  - `tolerate_stale_data` — return cached data on failure
+- 🔤 **cspell.yaml** — spell check configuration
+
+**Fork features preserved (by [@nrp929](https://github.com/nrp929)):**
+- Config flow with UI setup, validation, reauth, and options flow
+- `set_mode` service (Self Consumption / Time of Use / Emergency Backup)
+- GridSwitch toggle (on/off)
+- Dynamic accessory discovery (`SMART_CIRCUIT_MODULE`)
+- Diagnostics with redacted export
+- Battery Charge from Grid calculated sensor
+- Flipped Battery Use (`battery_use * -1`)
+- Unit conversions (Wh→kWh for switch/V2L)
+- Lazy client initialization in executor
+- Consecutive failure tracking (3-failure threshold)
+- DeviceInfo device registry integration
+- Entity description dataclass pattern
+
+**Merge engineering by [@nrp929](https://github.com/nrp929) with Hermes Agent.**
+
+### Version 1.0.11 (2026-06-10)
+- Version bump and manifest update
+
+### Version 1.0.10 (2026-06-10)
+- ⚠️ **CRITICAL FIX**: Removed Grid Connection switch (requires unreleased library version)
+- 🐛 FIXED: ImportError for AccessoryType and GridStatus classes
+- 🐛 FIXED: Integration now loads successfully with franklinwh 0.4.1
+- ℹ️ NOTE: Smart circuit switches (1-3) still work correctly
+
+### Version 1.0.9 (2026-06-10)
 - ✨ **NEW**: Working `set_mode` service for operation mode control
 - ✨ **NEW**: Support for battery reserve percentage setting
 - ⬆️ **UPDATED**: Requires franklinwh library 0.6.0+ (includes Mode class)
@@ -264,10 +326,11 @@ You may choose either license when using or contributing to this project.
 
 ## 🙏 Acknowledgments
 
-- **Original Integration**: [@richo](https://github.com/richo) for the initial implementation
+- **Original Integration**: [@richo](https://github.com/richo) for the initial implementation and Python library
 - **Python Library**: [franklinwh-python](https://github.com/richo/franklinwh-python) by [@richo](https://github.com/richo)
 - **Complete Rewrite**: Joshua Seidel ([@JoshuaSeidel](https://github.com/JoshuaSeidel)) with Anthropic Claude Sonnet 4.5
 - **set_mode Implementation**: [@j4m3z0r](https://github.com/j4m3z0r) for the working mode control implementation
+- **Merge & Fork Engineering**: [@nrp929](https://github.com/nrp929) with Hermes Agent
 - **Community**: Thanks to the Home Assistant community and all contributors
 
 ## ⚠️ Disclaimer
